@@ -57,4 +57,4 @@ resultado = [(m,t) for m in interesse.index for t in interesse.columns if var [m
 
 for m in interesse.index:
     alocacoes = [item [1] for item in resultado if item [0] == m]
-    print (m, ": ", alocacoes [0], " e ", alocacoes [1])
+    print (m, ": ", "\t".join (alocacoes))
