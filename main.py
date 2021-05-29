@@ -23,7 +23,7 @@ solver = pywraplp.Solver.CreateSolver("Alocação de Membros", "CBC")
 df["X"] = df.apply(lambda r: solver.BoolVar(f"X_{r.Nome}_{r.Time}") if not r["Fixo"] else 1, axis=1)
 
 # Função Objetivo
-solver.Minimize(solver.Sum(df.query('~ Fixo').apply(lambda r: r['Interesse'] * r['X'], axis=1)))
+solver.Minimize(solver.Sum(df['Interesse'] * df['X']))
 
 # O membro deve ser alocado em apenas uma área
 (df
