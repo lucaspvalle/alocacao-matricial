@@ -55,4 +55,4 @@ else:
 
 # Imprimindo resultados
 df["sol"] = df.apply(lambda r: r['X'].value() if not r['X'] == 1 else 1, axis=1)
-df.to_csv("output/solucao.csv", columns=["Nome", "Time", "sol"], index=False)
+df.to_csv("output/solucao.csv", columns=["Nome", "Time"], index=False)
