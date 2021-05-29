@@ -2,9 +2,9 @@ from ortools.linear_solver import pywraplp
 import pandas as pd
 
 # Importação
-df = pd.read_csv("input/formulario.csv", encoding="unicode_escape", sep=";")  # interesses dos membros
-limites = pd.read_csv("input/times.csv", encoding="unicode_escape", sep=";", index_col=0).T  # MaxMin por time
-exceto = pd.read_csv("input/exceto.csv", encoding="unicode_escape", sep=";")  # não entra no domínio
+df = pd.read_csv("input/formulario.csv")  # interesses dos membros
+limites = pd.read_csv("input/times.csv", index_col=0).T  # MaxMin por time
+exceto = pd.read_csv("input/exceto.csv")  # não entra no domínio
 
 # Pré-processamento
 df = (df
@@ -17,11 +17,14 @@ df = (df
 # Solver
 solver = pywraplp.Solver.CreateSolver("Alocação de Membros", "CBC")
 
+# Convertendo em booleano para restringir domínio
+df["Fixo"] = df["Fixo"] != 0
+
 # Variável de decisão
 df["X"] = df.apply(lambda r: solver.BoolVar(f"X_{r.Nome}_{r.Time}") if not r["Fixo"] else 1, axis=1)
 
 # Função Objetivo
-solver.Minimize(solver.Sum(df["Interesse"] * df["X"]))
+solver.Minimize(solver.Sum(df.query('~ Fixo').apply(lambda r: r['Interesse'] * r['X'], axis=1)))
 
 # O membro deve ser alocado em apenas uma área
 (df
@@ -31,7 +34,7 @@ solver.Minimize(solver.Sum(df["Interesse"] * df["X"]))
 
 # O membro deve ser alocado em apenas um projeto
 (df
- .query('~ Time.str.contains("Área")')
+ .query('~ Time.str.contains("Area")')
  .groupby('Nome')
  .apply(lambda r: solver.Add(solver.Sum(r['X']) == 1, f"aloca_projetos_{r.iloc[0].Nome}")))
 
@@ -45,14 +48,14 @@ solver.Minimize(solver.Sum(df["Interesse"] * df["X"]))
  .groupby("Time")
  .apply(lambda r: solver.Add(solver.Sum(r['X']) >= r.iloc[0]['Min'], f"limite_min_{r.iloc[0].Time}")))
 
-# Resolvendo
 status = solver.Solve()
 
 if status == pywraplp.Solver.OPTIMAL:
     print('Valor objetivo:', solver.Objective().Value())
-else:
-    print('Não há solução factível!')
 
-# Imprimindo resultados
-df["sol"] = df.apply(lambda r: r['X'].value() if not r['X'] == 1 else 1, axis=1)
-df.to_csv("output/solucao.csv", columns=["Nome", "Time"], index=False)
+    # Imprimindo resultados
+    df["sol"] = df.apply(lambda r: r['X'].solution_value() if not r['Fixo'] else 1, axis=1)
+    df.query('sol == 1').to_csv("output/solucao.csv", columns=["Nome", "Time"], index=False)
+
+else:
+    print('Não há solução!')
