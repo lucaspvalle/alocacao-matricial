@@ -4,23 +4,30 @@ import pandas as pd
 # Importação
 df = pd.read_csv("input/formulario.csv")  # interesses dos membros
 limites = pd.read_csv("input/times.csv", index_col=0).T  # MaxMin por time
-exceto = pd.read_csv("input/exceto.csv")  # não entra no domínio
+exceto = pd.read_csv("input/exceto.csv")  # restringe domínio da variável
 
 # Pré-processamento
+exceto["Dominio"] = exceto.apply(lambda r: r['Fixo'].split(' ')[0], axis=1)
+
 df = (df
       .replace([3, 4], [1000, 10000])
       .melt(id_vars="Nome", var_name="Time", value_name="Interesse")
-      .merge(exceto, left_on=["Nome", "Time"], right_on=["Nome", "Fixo"], how="outer")
-      .merge(limites, left_on=["Time"], right_index=True)
+      .assign(Natureza=lambda r: r['Time'].str.split(' ').str[0])
+      .merge(exceto[["Nome", "Dominio"]], left_on=["Nome", "Natureza"], right_on=["Nome", "Dominio"], how="outer")
+      .merge(exceto[["Nome", "Fixo"]], left_on=["Nome", "Time"], right_on=["Nome", "Fixo"], how="outer")
+      .drop("Natureza", axis=1)
       .fillna(0))
 
-df["Fixo"] = df["Fixo"] != 0  # Convertendo em booleano para restringir domínio
+# Convertendo em booleano para restringir domínio
+df["Fixo"] = df["Fixo"] != 0
+df["Dominio"] = df["Dominio"] == 0
 
 # Modelo
-solver = pywraplp.Solver.CreateSolver("Alocação de Membros", "CBC")
+solver = pywraplp.Solver.CreateSolver("Otimizador", "CBC")
 
 # Variável de decisão
-df["X"] = df.apply(lambda r: solver.BoolVar(f"X_{r.Nome}_{r.Time}") if not r["Fixo"] else 1, axis=1)
+df["X"] = df.apply(lambda r: solver.BoolVar(f"X_{r.Nome}_{r.Time}") if r["Dominio"] else (1 if r["Fixo"] else 0),
+                   axis=1)
 
 # Função Objetivo
 solver.Minimize(solver.Sum(df['Interesse'] * df['X']))
@@ -44,7 +51,7 @@ def limita_membros_no_time(r):
 
 
 # O time (área ou projeto) possui limites inferiores e superiores de membros
-df.groupby("Time").apply(limita_membros_no_time)
+df.merge(limites, left_on=["Time"], right_index=True).groupby("Time").apply(limita_membros_no_time)
 
 status = solver.Solve()
 
@@ -52,7 +59,7 @@ if status == pywraplp.Solver.OPTIMAL:
     print('Valor objetivo:', solver.Objective().Value())
 
     # Imprimindo resultados
-    df["sol"] = df.apply(lambda r: r['X'].solution_value() if not r['Fixo'] else 1, axis=1)
+    df["sol"] = df.apply(lambda r: r['X'].solution_value() if r["Dominio"] else (1 if r["Fixo"] else 0), axis=1)
     df.query('sol == 1').to_csv("output/solucao.csv", columns=["Nome", "Time"], index=False)
 
 else:
