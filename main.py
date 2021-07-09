@@ -23,7 +23,7 @@ df["Fixo"] = df["Fixo"] != 0
 df["Dominio"] = df["Dominio"] == 0
 
 # Modelo
-solver = pywraplp.Solver.CreateSolver("Otimizador", "CBC")
+solver = pywraplp.Solver.CreateSolver("CBC")
 
 # Variável de decisão
 df["X"] = df.apply(lambda r: solver.BoolVar(f"X_{r.Nome}_{r.Time}") if r["Dominio"] else (1 if r["Fixo"] else 0),
