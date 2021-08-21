@@ -7,7 +7,7 @@ limites = pd.read_csv("input/times.csv", index_col=0).T  # MaxMin por time
 exceto = pd.read_csv("input/exceto.csv")  # restringe domínio da variável
 
 # Pré-processamento
-exceto["Dominio"] = exceto.apply(lambda r: r['Fixo'].split(' ')[0], axis=1)
+exceto["Dominio"] = exceto['Fixo'].str.split(' ').str[0]
 
 df = (df
       .replace([3, 4], [1000, 10000])
@@ -26,8 +26,7 @@ df["Dominio"] = df["Dominio"] == 0
 solver = pywraplp.Solver.CreateSolver("CBC")
 
 # Variável de decisão
-df["X"] = df.apply(lambda r: solver.BoolVar(f"X_{r.Nome}_{r.Time}") if r["Dominio"] else (1 if r["Fixo"] else 0),
-                   axis=1)
+df["X"] = df.apply(lambda r: solver.BoolVar(f"X_{r.Nome}_{r.Time}") if r["Dominio"] else r["Fixo"] * 1, axis=1)
 
 # Função Objetivo
 solver.Minimize(solver.Sum(df['Interesse'] * df['X']))
@@ -56,11 +55,11 @@ df.merge(limites, left_on=["Time"], right_index=True).groupby("Time").apply(limi
 status = solver.Solve()
 
 if status == pywraplp.Solver.OPTIMAL:
-    print('Valor objetivo:', solver.Objective().Value())
+    print('Valor objetivo: ', solver.Objective().Value())
 
     # Imprimindo resultados
-    df["sol"] = df.apply(lambda r: r['X'].solution_value() if r["Dominio"] else (1 if r["Fixo"] else 0), axis=1)
-    df.query('sol == 1').to_csv("output/solucao.csv", columns=["Nome", "Time"], index=False)
+    df["sol"] = df.apply(lambda r: r['X'].solution_value() if r["Dominio"] else r["Fixo"] * 1, axis=1) == 1
+    df.query('sol').to_csv("output/solucao.csv", columns=["Nome", "Time"], index=False)
 
 else:
     print('Não há solução!')
